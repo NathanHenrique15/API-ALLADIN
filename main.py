@@ -1,25 +1,36 @@
-from fastapi import FastAPI # API
-import requests # buscas
+from fastapi import FastAPI, HTTPException
+import httpx
+from datetime import datetime
 
 app = FastAPI()
 
-@app.get("/consultar")
-def buscar_precos(data_atual: str):
+URL_PRECOS = "https://testedefensoriapr.pythonanywhere.com/precos"
 
-    url = "https://testedefensoriapr.pythonanywhere.com/precos"
-    
+
+@app.get("/consultar")
+async def buscar_precos():
+
+    data_atual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     try:
-        # A lógica de buscar os dados (Passo 5) entra aqui
-        resposta = requests.get(url, timeout=10)
-        resposta.raise_for_status() 
-        dados_da_loja = resposta.json()
-        
-        # O retorno dos dados com a data (Requisito do desafio) [1]
+        async with httpx.AsyncClient(timeout=10) as client:
+            resposta = await client.get(URL_PRECOS)
+            resposta.raise_for_status()
+            dados_da_loja = resposta.json()
+
         return {
             "data_da_consulta": data_atual,
             "precos_recebidos": dados_da_loja
         }
-        
-    except Exception:
-        # O tratamento de erro obrigatório (Requisito do desafio) [2]
-        return {"erro": "Desculpe, o serviço de preços está indisponível."}
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=503,
+            detail="Serviço de preços indisponível."
+        )
+
+    except httpx.HTTPStatusError:
+        raise HTTPException(
+            status_code=502,
+            detail="Erro ao acessar o serviço externo."
+        )
